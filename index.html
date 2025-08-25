@@ -1,0 +1,1780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoodNotes Clone - Enhanced with Animations</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .canvas-container {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .dark .canvas-container {
+            border-color: #374151;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        .tool-btn {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tool-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .tool-btn.active {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .tool-btn:active {
+            transform: translateY(0);
+        }
+
+        .page-thumbnail {
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .page-thumbnail:hover {
+            border-color: #3b82f6;
+            transform: scale(1.05);
+        }
+
+        .page-thumbnail.active {
+            border-color: #3b82f6;
+            background: #eff6ff;
+            transform: scale(1.05);
+        }
+
+        .dark .page-thumbnail.active {
+            background: #1e3a8a;
+        }
+
+        .slider {
+            -webkit-appearance: none;
+            appearance: none;
+            background: linear-gradient(to right, #e5e7eb 0%, #e5e7eb 100%);
+            outline: none;
+            border-radius: 15px;
+            height: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.6);
+        }
+
+        .notebook-item {
+            transition: all 0.3s ease;
+            border-radius: 8px;
+            margin: 2px 0;
+        }
+
+        .notebook-item:hover {
+            background: #f3f4f6;
+            transform: translateX(4px);
+        }
+
+        .dark .notebook-item:hover {
+            background: #374151;
+        }
+
+        .delete-btn {
+            opacity: 0;
+            transition: all 0.3s ease;
+            transform: scale(0.8);
+        }
+
+        .notebook-item:hover .delete-btn {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .eraser-trail {
+            position: absolute;
+            pointer-events: none;
+            width: 30px;
+            height: 30px;
+            border: 2px solid #ef4444;
+            border-radius: 50%;
+            background: rgba(239, 68, 68, 0.1);
+            transform: translate(-50%, -50%);
+            animation: eraserPulse 0.3s ease-out;
+            z-index: 1000;
+        }
+
+        @keyframes eraserPulse {
+            0% {
+                transform: translate(-50%, -50%) scale(0.5);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        @keyframes fadeOut {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+        }
+
+        .fade-out-animation {
+            animation: fadeOut 0.3s ease-out forwards;
+        }
+
+        .shape-preview {
+            opacity: 0.6;
+            stroke-dasharray: 5, 5;
+            animation: dashMove 0.5s linear infinite;
+        }
+
+        @keyframes dashMove {
+            0% {
+                stroke-dashoffset: 0;
+            }
+            100% {
+                stroke-dashoffset: 10;
+            }
+        }
+
+        .mobile-toolbar {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .desktop-toolbar {
+                display: none;
+            }
+            .mobile-toolbar {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                justify-content: center;
+                padding: 12px;
+            }
+            .tool-btn {
+                min-width: 44px;
+                min-height: 44px;
+                font-size: 14px;
+            }
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                height: 100vh;
+                z-index: 50;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .canvas-container {
+                margin: 8px;
+            }
+        }
+
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .tool-btn {
+                padding: 10px;
+            }
+            .sidebar {
+                width: 240px;
+            }
+        }
+
+        .color-btn {
+            transition: all 0.3s ease;
+            position: relative;
+            border: 3px solid transparent;
+        }
+
+        .color-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .color-btn.active {
+            border-color: #3b82f6;
+            transform: scale(1.1);
+        }
+
+        .template-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.3;
+        }
+
+        .loading-spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 40;
+        }
+
+        .floating-toolbar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            border-radius: 25px;
+            padding: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 30;
+        }
+
+        @media (max-width: 768px) {
+            .floating-toolbar {
+                display: flex;
+                gap: 8px;
+            }
+        }
+
+        .pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: .5;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 min-h-screen transition-all duration-500">
+    <div id="app" class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between sticky top-0 z-40">
+            <div class="flex items-center space-x-4">
+                <button id="sidebarToggle" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300 lg:hidden">
+                    <i class="fas fa-bars text-gray-600 dark:text-gray-300"></i>
+                </button>
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-sticky-note text-white text-sm"></i>
+                    </div>
+                    <h1 id="currentNotebook" class="text-lg font-semibold text-gray-900 dark:text-white hidden sm:block">My First Note</h1>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button id="undoBtn" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300" title="Undo">
+                    <i class="fas fa-undo text-gray-600 dark:text-gray-300"></i>
+                </button>
+                <button id="redoBtn" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300" title="Redo">
+                    <i class="fas fa-redo text-gray-600 dark:text-gray-300"></i>
+                </button>
+                <button id="themeToggle" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300" title="Toggle Theme">
+                    <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
+                </button>
+                <button id="shareBtn" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300 hidden sm:block" title="Share">
+                    <i class="fas fa-share text-gray-600 dark:text-gray-300"></i>
+                </button>
+                <div class="flex items-center bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm">
+                    <i class="fas fa-user-circle mr-2"></i>
+                    <span class="hidden sm:inline">User</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex flex-1 overflow-hidden">
+            <!-- Backdrop for mobile -->
+            <div id="backdrop" class="backdrop hidden lg:hidden"></div>
+            
+            <!-- Sidebar -->
+            <aside id="sidebar" class="sidebar w-64 lg:w-72 bg-white/90 dark:bg-gray-800/90 backdrop-blur-lg border-r border-gray-200 dark:border-gray-700 flex flex-col">
+                <!-- Search -->
+                <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                    <div class="relative">
+                        <input type="text" id="searchInput" placeholder="Search notes..." 
+                               class="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300">
+                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                    <button id="newNotebookBtn" class="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 px-4 rounded-xl mb-3 transition-all duration-300 transform hover:scale-105 hover:shadow-lg">
+                        <i class="fas fa-plus mr-2"></i>New Notebook
+                    </button>
+                    <button id="importBtn" class="w-full bg-gray-500 hover:bg-gray-600 text-white py-3 px-4 rounded-xl transition-all duration-300 transform hover:scale-105">
+                        <i class="fas fa-upload mr-2"></i>Import Document
+                    </button>
+                    <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.pptx,.jpg,.jpeg,.png">
+                </div>
+
+                <!-- Notebooks List -->
+                <div class="flex-1 overflow-y-auto">
+                    <div class="p-4">
+                        <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider">Notebooks</h3>
+                        <div id="notebooksList">
+                            <div class="notebook-item p-3 rounded-xl cursor-pointer flex items-center justify-between active bg-blue-50 dark:bg-blue-900/30" data-id="1">
+                                <div class="flex items-center space-x-3">
+                                    <i class="fas fa-book text-blue-500 text-lg"></i>
+                                    <span class="text-gray-900 dark:text-white font-medium">My First Note</span>
+                                </div>
+                                <button class="delete-btn text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-300">
+                                    <i class="fas fa-trash-alt text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="flex-1 flex flex-col overflow-hidden">
+                <!-- Desktop Toolbar -->
+                <div class="desktop-toolbar bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700 p-4">
+                    <div class="flex items-center justify-center space-x-3 flex-wrap">
+                        <button id="penTool" class="tool-btn active p-3 rounded-xl border border-gray-300 dark:border-gray-600 hover:border-blue-400 transition-all duration-300" title="Pen">
+                            <i class="fas fa-pen text-lg"></i>
+                        </button>
+                        <button id="highlighterTool" class="tool-btn p-3 rounded-xl border border-gray-300 dark:border-gray-600 hover:border-blue-400 transition-all duration-300" title="Highlighter">
+                            <i class="fas fa-highlighter text-lg"></i>
+                        </button>
+                        <button id="eraserTool" class="tool-btn p-3 rounded-xl border border-gray-300 dark:border-gray-600 hover:border-red-400 transition-all duration-300" title="Eraser">
+                            <i class="fas fa-eraser text-lg"></i>
+                        </button>
+                        <button id="textTool" class="tool-btn p-3 rounded-xl border border-gray-300 dark:border-gray-600 hover:border-blue-400 transition-all duration-300" title="Text">
+                            <i class="fas fa-font text-lg"></i>
+                        </button>
+                        <button id="shapesTool" class="tool-btn p-3 rounded-xl border border-gray-300 dark:border-gray-600 hover:border-blue-400 transition-all duration-300" title="Shapes">
+                            <i class="fas fa-square text-lg"></i>
+                        </button>
+                        <button id="selectTool" class="tool-btn p-3 rounded-xl border border-gray-300 dark:border-gray-600 hover:border-blue-400 transition-all duration-300" title="Select">
+                            <i class="fas fa-mouse-pointer text-lg"></i>
+                        </button>
+                        <div class="h-8 w-px bg-gray-300 dark:bg-gray-600"></div>
+                        <button id="addPageBtn" class="tool-btn p-3 rounded-xl border border-gray-300 dark:border-gray-600 hover:border-green-400 transition-all duration-300" title="Add Page">
+                            <i class="fas fa-plus text-lg"></i>
+                        </button>
+                        <button id="deletePageBtn" class="tool-btn p-3 rounded-xl border border-gray-300 dark:border-gray-600 text-red-500 hover:border-red-400 transition-all duration-300" title="Delete Page">
+                            <i class="fas fa-trash text-lg"></i>
+                        </button>
+                        <div class="h-8 w-px bg-gray-300 dark:bg-gray-600"></div>
+                        <button id="exportBtn" class="tool-btn p-3 rounded-xl border border-gray-300 dark:border-gray-600 hover:border-blue-400 transition-all duration-300" title="Export">
+                            <i class="fas fa-download text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Mobile Toolbar -->
+                <div class="mobile-toolbar bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700">
+                    <button id="penToolMobile" class="tool-btn active p-2 rounded-lg border border-gray-300 dark:border-gray-600" title="Pen">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                    <button id="highlighterToolMobile" class="tool-btn p-2 rounded-lg border border-gray-300 dark:border-gray-600" title="Highlighter">
+                        <i class="fas fa-highlighter"></i>
+                    </button>
+                    <button id="eraserToolMobile" class="tool-btn p-2 rounded-lg border border-gray-300 dark:border-gray-600" title="Eraser">
+                        <i class="fas fa-eraser"></i>
+                    </button>
+                    <button id="textToolMobile" class="tool-btn p-2 rounded-lg border border-gray-300 dark:border-gray-600" title="Text">
+                        <i class="fas fa-font"></i>
+                    </button>
+                    <button id="shapesToolMobile" class="tool-btn p-2 rounded-lg border border-gray-300 dark:border-gray-600" title="Shapes">
+                        <i class="fas fa-square"></i>
+                    </button>
+                    <button id="selectToolMobile" class="tool-btn p-2 rounded-lg border border-gray-300 dark:border-gray-600" title="Select">
+                        <i class="fas fa-mouse-pointer"></i>
+                    </button>
+                </div>
+
+                <div class="flex flex-1 overflow-hidden">
+                    <!-- Canvas Area -->
+                    <div class="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900 overflow-auto">
+                        <!-- Canvas Container -->
+                        <div class="flex-1 p-4 lg:p-8 overflow-auto">
+                            <div class="max-w-5xl mx-auto">
+                                <div class="canvas-container bg-white dark:bg-gray-800 relative">
+                                    <canvas id="templateCanvas" class="template-background"></canvas>
+                                    <canvas id="drawingCanvas" width="800" height="1000"></canvas>
+                                    <div id="eraserTrail"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Page Navigation -->
+                        <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-t border-gray-200 dark:border-gray-700 p-4">
+                            <div class="flex items-center justify-center space-x-4">
+                                <button id="prevPageBtn" class="p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300">
+                                    <i class="fas fa-chevron-left text-gray-600 dark:text-gray-300"></i>
+                                </button>
+                                <div class="flex space-x-2 overflow-x-auto" id="pagesList">
+                                    <div class="page-thumbnail active w-12 h-16 bg-white dark:bg-gray-700 rounded-lg border-2 border-blue-500 flex items-center justify-center">
+                                        <span class="text-xs font-medium">1</span>
+                                    </div>
+                                </div>
+                                <button id="nextPageBtn" class="p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300">
+                                    <i class="fas fa-chevron-right text-gray-600 dark:text-gray-300"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tool Properties Panel -->
+                    <aside class="hidden lg:flex w-80 xl:w-96 bg-white/90 dark:bg-gray-800/90 backdrop-blur-lg border-l border-gray-200 dark:border-gray-700 p-6 flex-col">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-6">Tool Properties</h3>
+                        
+                        <!-- Color Picker -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Color</label>
+                            <div class="flex space-x-2 mb-4 flex-wrap gap-2">
+                                <button class="color-btn w-10 h-10 rounded-full bg-black active" data-color="#000000"></button>
+                                <button class="color-btn w-10 h-10 rounded-full bg-blue-500" data-color="#3b82f6"></button>
+                                <button class="color-btn w-10 h-10 rounded-full bg-red-500" data-color="#ef4444"></button>
+                                <button class="color-btn w-10 h-10 rounded-full bg-green-500" data-color="#10b981"></button>
+                                <button class="color-btn w-10 h-10 rounded-full bg-yellow-500" data-color="#f59e0b"></button>
+                                <button class="color-btn w-10 h-10 rounded-full bg-purple-500" data-color="#8b5cf6"></button>
+                            </div>
+                            <input type="color" id="customColor" class="w-full h-12 rounded-xl border border-gray-300 dark:border-gray-600 cursor-pointer">
+                        </div>
+
+                        <!-- Stroke Width -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Stroke Width</label>
+                            <input type="range" id="strokeWidth" class="slider w-full mb-3" min="1" max="50" value="3">
+                            <div class="text-center text-sm text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg">
+                                <span id="strokeWidthValue">3</span>px
+                            </div>
+                        </div>
+
+                        <!-- Opacity -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Opacity</label>
+                            <input type="range" id="opacity" class="slider w-full mb-3" min="0" max="100" value="100">
+                            <div class="text-center text-sm text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg">
+                                <span id="opacityValue">100</span>%
+                            </div>
+                        </div>
+
+                        <!-- Font Size (for text tool) -->
+                        <div class="mb-6" id="fontSizeContainer" style="display: none;">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Font Size</label>
+                            <input type="range" id="fontSize" class="slider w-full mb-3" min="8" max="72" value="16">
+                            <div class="text-center text-sm text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg">
+                                <span id="fontSizeValue">16</span>px
+                            </div>
+                        </div>
+
+                        <!-- Shape Options -->
+                        <div class="mb-6" id="shapeContainer" style="display: none;">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Shape</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <button class="shape-btn p-4 border-2 border-gray-300 dark:border-gray-600 rounded-xl active hover:border-blue-400 transition-all duration-300" data-shape="rectangle">
+                                    <i class="fas fa-square text-xl"></i>
+                                </button>
+                                <button class="shape-btn p-4 border-2 border-gray-300 dark:border-gray-600 rounded-xl hover:border-blue-400 transition-all duration-300" data-shape="circle">
+                                    <i class="fas fa-circle text-xl"></i>
+                                </button>
+                                <button class="shape-btn p-4 border-2 border-gray-300 dark:border-gray-600 rounded-xl hover:border-blue-400 transition-all duration-300" data-shape="arrow">
+                                    <i class="fas fa-arrow-right text-xl"></i>
+                                </button>
+                                <button class="shape-btn p-4 border-2 border-gray-300 dark:border-gray-600 rounded-xl hover:border-blue-400 transition-all duration-300" data-shape="line">
+                                    <i class="fas fa-minus text-xl"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="space-y-3 mt-auto">
+                            <button id="deleteSelectedBtn" class="w-full bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white py-3 px-4 rounded-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                                <i class="fas fa-trash mr-2"></i>Delete Selected
+                            </button>
+                            <button id="clearCanvasBtn" class="w-full bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white py-3 px-4 rounded-xl transition-all duration-300 transform hover:scale-105">
+                                <i class="fas fa-broom mr-2"></i>Clear All
+                            </button>
+                        </div>
+                    </aside>
+                </div>
+            </main>
+        </div>
+
+        <!-- Floating Toolbar for Mobile -->
+        <div class="floating-toolbar">
+            <button id="addPageBtnMobile" class="p-3 rounded-full bg-blue-500 text-white" title="Add Page">
+                <i class="fas fa-plus"></i>
+            </button>
+            <button id="deletePageBtnMobile" class="p-3 rounded-full bg-red-500 text-white" title="Delete Page">
+                <i class="fas fa-trash"></i>
+            </button>
+            <button id="exportBtnMobile" class="p-3 rounded-full bg-green-500 text-white" title="Export">
+                <i class="fas fa-download"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- New Notebook Modal -->
+    <div id="newNotebookModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md mx-auto transform transition-all duration-300">
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-6">Create New Notebook</h3>
+            <input type="text" id="notebookNameInput" placeholder="Notebook name..." 
+                   class="w-full p-4 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white mb-6 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Template</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <button class="template-btn p-4 border-2 border-gray-300 dark:border-gray-600 rounded-xl active hover:border-blue-400 transition-all duration-300" data-template="blank">
+                        <div class="w-full h-12 bg-white dark:bg-gray-700 border rounded-lg"></div>
+                        <span class="text-sm mt-2 block font-medium">Blank</span>
+                    </button>
+                    <button class="template-btn p-4 border-2 border-gray-300 dark:border-gray-600 rounded-xl hover:border-blue-400 transition-all duration-300" data-template="lined">
+                        <div class="w-full h-12 bg-white dark:bg-gray-700 border rounded-lg relative overflow-hidden">
+                            <div class="absolute inset-0 flex flex-col justify-evenly">
+                                <div class="h-px bg-blue-200 dark:bg-blue-800"></div>
+                                <div class="h-px bg-blue-200 dark:bg-blue-800"></div>
+                                <div class="h-px bg-blue-200 dark:bg-blue-800"></div>
+                                <div class="h-px bg-blue-200 dark:bg-blue-800"></div>
+                            </div>
+                        </div>
+                        <span class="text-sm mt-2 block font-medium">Lined</span>
+                    </button>
+                    <button class="template-btn p-4 border-2 border-gray-300 dark:border-gray-600 rounded-xl hover:border-blue-400 transition-all duration-300" data-template="grid">
+                        <div class="w-full h-12 bg-white dark:bg-gray-700 border rounded-lg relative overflow-hidden">
+                            <div class="absolute inset-0 grid grid-cols-4 gap-px bg-blue-200 dark:bg-blue-800 p-1">
+                                <div class="bg-white dark:bg-gray-700"></div>
+                                <div class="bg-white dark:bg-gray-700"></div>
+                                <div class="bg-white dark:bg-gray-700"></div>
+                                <div class="bg-white dark:bg-gray-700"></div>
+                                <div class="bg-white dark:bg-gray-700"></div>
+                                <div class="bg-white dark:bg-gray-700"></div>
+                                <div class="bg-white dark:bg-gray-700"></div>
+                                <div class="bg-white dark:bg-gray-700"></div>
+                            </div>
+                        </div>
+                        <span class="text-sm mt-2 block font-medium">Grid</span>
+                    </button>
+                    <button class="template-btn p-4 border-2 border-gray-300 dark:border-gray-600 rounded-xl hover:border-blue-400 transition-all duration-300" data-template="dotted">
+                        <div class="w-full h-12 bg-white dark:bg-gray-700 border rounded-lg relative overflow-hidden">
+                            <div class="absolute inset-0 grid grid-cols-6 grid-rows-4 gap-1 p-2">
+                                <div class="w-1 h-1 bg-blue-300 dark:bg-blue-700 rounded-full"></div>
+                                <div class="w-1 h-1 bg-blue-300 dark:bg-blue-700 rounded-full"></div>
+                                <div class="w-1 h-1 bg-blue-300 dark:bg-blue-700 rounded-full"></div>
+                                <div class="w-1 h-1 bg-blue-300 dark:bg-blue-700 rounded-full"></div>
+                                <div class="w-1 h-1 bg-blue-300 dark:bg-blue-700 rounded-full"></div>
+                                <div class="w-1 h-1 bg-blue-300 dark:bg-blue-700 rounded-full"></div>
+                            </div>
+                        </div>
+                        <span class="text-sm mt-2 block font-medium">Dotted</span>
+                    </button>
+                </div>
+            </div>
+            <div class="flex space-x-3">
+                <button id="cancelNewNotebook" class="flex-1 py-3 px-4 border-2 border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300">
+                    Cancel
+                </button>
+                <button id="createNotebook" class="flex-1 py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl transition-all duration-300 transform hover:scale-105">
+                    Create
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let canvas;
+        let templateCanvas;
+        let currentTool = 'pen';
+        let currentColor = '#000000';
+        let currentStrokeWidth = 3;
+        let currentOpacity = 1;
+        let currentShape = 'rectangle';
+        let isDrawing = false;
+        let isErasing = false;
+        let currentNotebookId = 1;
+        let currentPageIndex = 0;
+        let pages = [{ id: 1, objects: [], template: 'blank' }];
+        let notebooks = [{ id: 1, name: 'My First Note', pages: pages }];
+        let selectedTemplate = 'blank';
+        let undoStack = [];
+        let redoStack = [];
+        let isDarkMode = false;
+        let isMobile = window.innerWidth <= 768;
+        let previewShape = null;
+        let eraserTrailTimeout;
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCanvas();
+            initializeEventListeners();
+            loadNotebooks();
+            updateUI();
+            handleResize();
+        });
+
+        window.addEventListener('resize', handleResize);
+
+        function handleResize() {
+            const wasMobile = isMobile;
+            isMobile = window.innerWidth <= 768;
+            
+            if (wasMobile !== isMobile) {
+                updateToolbarForDevice();
+                resizeCanvas();
+            }
+        }
+
+        function updateToolbarForDevice() {
+            // Update tool selection for current device
+            const tools = ['pen', 'highlighter', 'eraser', 'text', 'shapes', 'select'];
+            tools.forEach(tool => {
+                const desktopBtn = document.getElementById(tool + 'Tool');
+                const mobileBtn = document.getElementById(tool + 'ToolMobile');
+                
+                if (desktopBtn && mobileBtn) {
+                    if (currentTool === tool) {
+                        desktopBtn.classList.add('active');
+                        mobileBtn.classList.add('active');
+                    } else {
+                        desktopBtn.classList.remove('active');
+                        mobileBtn.classList.remove('active');
+                    }
+                }
+            });
+        }
+
+        function resizeCanvas() {
+            const container = document.querySelector('.canvas-container');
+            if (!container || !canvas) return;
+
+            const containerWidth = container.clientWidth - 2; // Account for border
+            let newWidth = Math.min(800, containerWidth);
+            let newHeight = (newWidth / 800) * 1000;
+
+            if (isMobile) {
+                newWidth = Math.min(600, containerWidth);
+                newHeight = (newWidth / 600) * 800;
+            }
+
+            canvas.setDimensions({
+                width: newWidth,
+                height: newHeight
+            });
+
+            if (templateCanvas) {
+                templateCanvas.width = newWidth;
+                templateCanvas.height = newHeight;
+                drawTemplate(pages[currentPageIndex]?.template || 'blank');
+            }
+        }
+
+        function initializeCanvas() {
+            canvas = new fabric.Canvas('drawingCanvas', {
+                backgroundColor: '#ffffff',
+                selection: false,
+                preserveObjectStacking: true
+            });
+
+            templateCanvas = document.getElementById('templateCanvas');
+            templateCanvas.width = canvas.width;
+            templateCanvas.height = canvas.height;
+
+            // Set canvas to drawing mode initially
+            canvas.isDrawingMode = true;
+            canvas.freeDrawingBrush.width = currentStrokeWidth;
+            canvas.freeDrawingBrush.color = currentColor;
+
+            // Enhanced event handlers
+            canvas.on('path:created', function(e) {
+                // Add animation to newly created paths
+                const path = e.path;
+                path.set({ opacity: 0 });
+                path.animate('opacity', 1, {
+                    duration: 300,
+                    easing: fabric.util.ease.easeOutCubic
+                });
+                saveState();
+            });
+
+            canvas.on('object:added', saveState);
+            canvas.on('object:removed', saveState);
+            canvas.on('object:modified', saveState);
+
+            // Handle selection
+            canvas.on('selection:created', updateDeleteButton);
+            canvas.on('selection:cleared', updateDeleteButton);
+            canvas.on('selection:updated', updateDeleteButton);
+
+            // Mouse events for enhanced interactions
+            canvas.on('mouse:move', handleMouseMove);
+            canvas.on('mouse:down', handleMouseDown);
+            canvas.on('mouse:up', handleMouseUp);
+
+            // Touch events for mobile
+            canvas.on('touch:gesture', function(e) {
+                e.e.preventDefault();
+            });
+
+            drawTemplate('blank');
+            saveState();
+            resizeCanvas();
+        }
+
+        function handleMouseMove(opt) {
+            if (currentTool === 'eraser') {
+                showEraserTrail(opt.e);
+            }
+        }
+
+        function handleMouseDown(opt) {
+            if (currentTool === 'shapes') {
+                startShapeDrawing(opt);
+            } else if (currentTool === 'text') {
+                addTextAtPosition(opt);
+            }
+        }
+
+        function handleMouseUp(opt) {
+            if (currentTool === 'shapes' && previewShape) {
+                finalizeShape();
+            }
+        }
+
+        function showEraserTrail(event) {
+            const canvasRect = canvas.upperCanvasEl.getBoundingClientRect();
+            const x = event.clientX - canvasRect.left;
+            const y = event.clientY - canvasRect.top;
+
+            // Remove existing trail
+            const existingTrail = document.querySelector('.eraser-trail');
+            if (existingTrail) {
+                existingTrail.remove();
+            }
+
+            // Create new trail
+            const trail = document.createElement('div');
+            trail.className = 'eraser-trail';
+            trail.style.left = (canvasRect.left + x) + 'px';
+            trail.style.top = (canvasRect.top + y) + 'px';
+            document.body.appendChild(trail);
+
+            // Remove trail after animation
+            clearTimeout(eraserTrailTimeout);
+            eraserTrailTimeout = setTimeout(() => {
+                if (trail.parentNode) {
+                    trail.remove();
+                }
+            }, 300);
+        }
+
+        function drawTemplate(template) {
+            if (!templateCanvas) return;
+            
+            const ctx = templateCanvas.getContext('2d');
+            ctx.clearRect(0, 0, templateCanvas.width, templateCanvas.height);
+            
+            ctx.strokeStyle = isDarkMode ? '#374151' : '#e5e7eb';
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.5;
+
+            switch(template) {
+                case 'lined':
+                    drawLines(ctx);
+                    break;
+                case 'grid':
+                    drawGrid(ctx);
+                    break;
+                case 'dotted':
+                    drawDots(ctx);
+                    break;
+                default:
+                    // Blank template - no drawing needed
+                    break;
+            }
+        }
+
+        function drawLines(ctx) {
+            const spacing = 30;
+            const width = templateCanvas.width;
+            const height = templateCanvas.height;
+
+            for (let y = spacing; y < height; y += spacing) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawGrid(ctx) {
+            const spacing = 30;
+            const width = templateCanvas.width;
+            const height = templateCanvas.height;
+
+            // Draw horizontal lines
+            for (let y = spacing; y < height; y += spacing) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+
+            // Draw vertical lines
+            for (let x = spacing; x < width; x += spacing) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+                ctx.stroke();
+            }
+        }
+
+        function drawDots(ctx) {
+            const spacing = 20;
+            const width = templateCanvas.width;
+            const height = templateCanvas.height;
+
+            ctx.fillStyle = isDarkMode ? '#374151' : '#e5e7eb';
+
+            for (let y = spacing; y < height; y += spacing) {
+                for (let x = spacing; x < width; x += spacing) {
+                    ctx.beginPath();
+                    ctx.arc(x, y, 1, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        function initializeEventListeners() {
+            // Theme toggle
+            document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+            // Sidebar toggle
+            document.getElementById('sidebarToggle').addEventListener('click', toggleSidebar);
+            document.getElementById('backdrop').addEventListener('click', closeSidebar);
+
+            // Tool buttons - both desktop and mobile
+            const tools = ['pen', 'highlighter', 'eraser', 'text', 'shapes', 'select'];
+            tools.forEach(tool => {
+                const desktopBtn = document.getElementById(tool + 'Tool');
+                const mobileBtn = document.getElementById(tool + 'ToolMobile');
+                
+                if (desktopBtn) {
+                    desktopBtn.addEventListener('click', () => selectTool(tool));
+                }
+                if (mobileBtn) {
+                    mobileBtn.addEventListener('click', () => selectTool(tool));
+                }
+            });
+
+            // Color buttons
+            document.querySelectorAll('.color-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    selectColor(this.dataset.color);
+                });
+            });
+
+            // Custom color picker
+            document.getElementById('customColor').addEventListener('change', function() {
+                selectColor(this.value);
+            });
+
+            // Sliders
+            document.getElementById('strokeWidth').addEventListener('input', function() {
+                currentStrokeWidth = parseInt(this.value);
+                document.getElementById('strokeWidthValue').textContent = this.value;
+                updateBrushProperties();
+            });
+
+            document.getElementById('opacity').addEventListener('input', function() {
+                currentOpacity = parseInt(this.value) / 100;
+                document.getElementById('opacityValue').textContent = this.value;
+                updateBrushProperties();
+            });
+
+            document.getElementById('fontSize').addEventListener('input', function() {
+                document.getElementById('fontSizeValue').textContent = this.value;
+            });
+
+            // Shape buttons
+            document.querySelectorAll('.shape-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    selectShape(this.dataset.shape);
+                });
+            });
+
+            // Template buttons
+            document.querySelectorAll('.template-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    selectTemplate(this.dataset.template);
+                });
+            });
+
+            // Action buttons - desktop and mobile
+            document.getElementById('newNotebookBtn').addEventListener('click', showNewNotebookModal);
+            document.getElementById('importBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+            document.getElementById('fileInput').addEventListener('change', handleFileImport);
+            document.getElementById('undoBtn').addEventListener('click', undo);
+            document.getElementById('redoBtn').addEventListener('click', redo);
+            document.getElementById('deleteSelectedBtn').addEventListener('click', deleteSelected);
+            document.getElementById('clearCanvasBtn').addEventListener('click', clearCanvas);
+            
+            // Page controls - both desktop and mobile
+            ['addPageBtn', 'addPageBtnMobile'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.addEventListener('click', addPage);
+            });
+            
+            ['deletePageBtn', 'deletePageBtnMobile'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.addEventListener('click', deletePage);
+            });
+            
+            ['exportBtn', 'exportBtnMobile'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.addEventListener('click', exportNotebook);
+            });
+
+            // Modal buttons
+            document.getElementById('cancelNewNotebook').addEventListener('click', hideNewNotebookModal);
+            document.getElementById('createNotebook').addEventListener('click', createNewNotebook);
+
+            // Page navigation
+            document.getElementById('prevPageBtn').addEventListener('click', () => navigatePage(-1));
+            document.getElementById('nextPageBtn').addEventListener('click', () => navigatePage(1));
+
+            // Search
+            document.getElementById('searchInput').addEventListener('input', handleSearch);
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', handleKeyboardShortcuts);
+
+            // Close modal on escape
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    hideNewNotebookModal();
+                }
+            });
+        }
+
+        function selectTool(tool) {
+            currentTool = tool;
+            
+            // Update UI for both desktop and mobile
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            
+            const desktopBtn = document.getElementById(tool + 'Tool');
+            const mobileBtn = document.getElementById(tool + 'ToolMobile');
+            
+            if (desktopBtn) desktopBtn.classList.add('active');
+            if (mobileBtn) mobileBtn.classList.add('active');
+
+            // Show/hide relevant controls
+            const fontSizeContainer = document.getElementById('fontSizeContainer');
+            const shapeContainer = document.getElementById('shapeContainer');
+            
+            if (fontSizeContainer) {
+                fontSizeContainer.style.display = tool === 'text' ? 'block' : 'none';
+            }
+            if (shapeContainer) {
+                shapeContainer.style.display = tool === 'shapes' ? 'block' : 'none';
+            }
+
+            // Configure canvas based on tool
+            switch(tool) {
+                case 'pen':
+                    canvas.isDrawingMode = true;
+                    canvas.selection = false;
+                    canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+                    updateBrushProperties();
+                    break;
+                case 'highlighter':
+                    canvas.isDrawingMode = true;
+                    canvas.selection = false;
+                    canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+                    canvas.freeDrawingBrush.color = currentColor + '4D'; // Add transparency
+                    canvas.freeDrawingBrush.width = currentStrokeWidth * 3;
+                    break;
+                case 'eraser':
+                    canvas.isDrawingMode = false;
+                    canvas.selection = false;
+                    enableAnimatedEraser();
+                    break;
+                case 'text':
+                    canvas.isDrawingMode = false;
+                    canvas.selection = true;
+                    break;
+                case 'shapes':
+                    canvas.isDrawingMode = false;
+                    canvas.selection = true;
+                    break;
+                case 'select':
+                    canvas.isDrawingMode = false;
+                    canvas.selection = true;
+                    break;
+            }
+        }
+
+        function enableAnimatedEraser() {
+            canvas.off('mouse:down');
+            canvas.off('mouse:move');
+            canvas.off('mouse:up');
+            
+            let isErasing = false;
+            
+            canvas.on('mouse:down', function(opt) {
+                if (currentTool === 'eraser') {
+                    isErasing = true;
+                    eraseAtPoint(opt);
+                }
+            });
+
+            canvas.on('mouse:move', function(opt) {
+                if (currentTool === 'eraser' && isErasing) {
+                    eraseAtPoint(opt);
+                }
+            });
+
+            canvas.on('mouse:up', function() {
+                if (currentTool === 'eraser') {
+                    isErasing = false;
+                }
+            });
+        }
+
+        function eraseAtPoint(opt) {
+            const pointer = canvas.getPointer(opt.e);
+            const objects = canvas.getObjects();
+            
+            for (let i = objects.length - 1; i >= 0; i--) {
+                const obj = objects[i];
+                if (obj.containsPoint(pointer)) {
+                    // Animate object removal
+                    obj.animate('opacity', 0, {
+                        duration: 200,
+                        easing: fabric.util.ease.easeOutCubic,
+                        onComplete: () => {
+                            canvas.remove(obj);
+                            canvas.renderAll();
+                        }
+                    });
+                    
+                    obj.animate('scaleX', 0.8, {
+                        duration: 200,
+                        easing: fabric.util.ease.easeOutCubic
+                    });
+                    
+                    obj.animate('scaleY', 0.8, {
+                        duration: 200,
+                        easing: fabric.util.ease.easeOutCubic
+                    });
+                    
+                    break; // Only erase one object at a time
+                }
+            }
+        }
+
+        function startShapeDrawing(opt) {
+            if (currentTool !== 'shapes') return;
+            
+            const pointer = canvas.getPointer(opt.e);
+            const startX = pointer.x;
+            const startY = pointer.y;
+            
+            // Remove any existing preview shape
+            if (previewShape) {
+                canvas.remove(previewShape);
+                previewShape = null;
+            }
+            
+            // Create preview shape
+            switch(currentShape) {
+                case 'rectangle':
+                    previewShape = new fabric.Rect({
+                        left: startX,
+                        top: startY,
+                        width: 1,
+                        height: 1,
+                        fill: 'transparent',
+                        stroke: currentColor,
+                        strokeWidth: currentStrokeWidth,
+                        opacity: currentOpacity,
+                        strokeDashArray: [5, 5]
+                    });
+                    break;
+                case 'circle':
+                    previewShape = new fabric.Circle({
+                        left: startX,
+                        top: startY,
+                        radius: 1,
+                        fill: 'transparent',
+                        stroke: currentColor,
+                        strokeWidth: currentStrokeWidth,
+                        opacity: currentOpacity,
+                        strokeDashArray: [5, 5]
+                    });
+                    break;
+                case 'line':
+                    previewShape = new fabric.Line([startX, startY, startX, startY], {
+                        stroke: currentColor,
+                        strokeWidth: currentStrokeWidth,
+                        opacity: currentOpacity,
+                        strokeDashArray: [5, 5]
+                    });
+                    break;
+            }
+            
+            if (previewShape) {
+                previewShape.isPreview = true;
+                canvas.add(previewShape);
+                
+                // Handle mouse move for live preview
+                const handleMove = function(opt) {
+                    if (!previewShape) return;
+                    
+                    const pointer = canvas.getPointer(opt.e);
+                    
+                    switch(currentShape) {
+                        case 'rectangle':
+                            const width = Math.abs(pointer.x - startX);
+                            const height = Math.abs(pointer.y - startY);
+                            previewShape.set({
+                                left: Math.min(pointer.x, startX),
+                                top: Math.min(pointer.y, startY),
+                                width: width,
+                                height: height
+                            });
+                            break;
+                        case 'circle':
+                            const radius = Math.sqrt(Math.pow(pointer.x - startX, 2) + Math.pow(pointer.y - startY, 2)) / 2;
+                            previewShape.set({
+                                left: Math.min(pointer.x, startX),
+                                top: Math.min(pointer.y, startY),
+                                radius: Math.max(1, radius)
+                            });
+                            break;
+                        case 'line':
+                            previewShape.set({ x2: pointer.x, y2: pointer.y });
+                            break;
+                    }
+                    
+                    canvas.renderAll();
+                };
+                
+                canvas.on('mouse:move', handleMove);
+                
+                // Store the handler for cleanup
+                previewShape.moveHandler = handleMove;
+            }
+        }
+
+        function finalizeShape() {
+            if (!previewShape) return;
+            
+            // Remove the move handler
+            if (previewShape.moveHandler) {
+                canvas.off('mouse:move', previewShape.moveHandler);
+            }
+            
+            // Remove preview styling
+            previewShape.set({
+                strokeDashArray: null,
+                isPreview: false
+            });
+            
+            // Add entrance animation
+            previewShape.set({ opacity: 0, scaleX: 0.8, scaleY: 0.8 });
+            previewShape.animate('opacity', currentOpacity, {
+                duration: 300,
+                easing: fabric.util.ease.easeOutCubic
+            });
+            previewShape.animate('scaleX', 1, {
+                duration: 300,
+                easing: fabric.util.ease.easeOutBack
+            });
+            previewShape.animate('scaleY', 1, {
+                duration: 300,
+                easing: fabric.util.ease.easeOutBack
+            });
+            
+            canvas.renderAll();
+            previewShape = null;
+        }
+
+        function addTextAtPosition(opt) {
+            if (currentTool !== 'text') return;
+            
+            const pointer = canvas.getPointer(opt.e);
+            const fontSize = parseInt(document.getElementById('fontSize').value) || 16;
+            
+            const text = new fabric.IText('Click to edit', {
+                left: pointer.x,
+                top: pointer.y,
+                fontFamily: 'Inter, sans-serif',
+                fontSize: fontSize,
+                fill: currentColor,
+                opacity: 0
+            });
+            
+            canvas.add(text);
+            
+            // Animate text appearance
+            text.animate('opacity', currentOpacity, {
+                duration: 300,
+                easing: fabric.util.ease.easeOutCubic,
+                onComplete: () => {
+                    canvas.setActiveObject(text);
+                    text.enterEditing();
+                }
+            });
+        }
+
+        function selectColor(color) {
+            currentColor = color;
+            document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active'));
+            const colorBtn = document.querySelector(`[data-color="${color}"]`);
+            if (colorBtn) colorBtn.classList.add('active');
+            updateBrushProperties();
+        }
+
+        function selectShape(shape) {
+            currentShape = shape;
+            document.querySelectorAll('.shape-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[data-shape="${shape}"]`).classList.add('active');
+        }
+
+        function selectTemplate(template) {
+            selectedTemplate = template;
+            document.querySelectorAll('.template-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[data-template="${template}"]`).classList.add('active');
+        }
+
+        function updateBrushProperties() {
+            if (canvas.freeDrawingBrush) {
+                canvas.freeDrawingBrush.color = currentTool === 'highlighter' ? 
+                    currentColor + '4D' : currentColor;
+                canvas.freeDrawingBrush.width = currentTool === 'highlighter' ? 
+                    currentStrokeWidth * 3 : currentStrokeWidth;
+            }
+        }
+
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            document.documentElement.classList.toggle('dark');
+            
+            const icon = document.querySelector('#themeToggle i');
+            icon.className = isDarkMode ? 
+                'fas fa-sun text-gray-600 dark:text-gray-300' : 
+                'fas fa-moon text-gray-600 dark:text-gray-300';
+            
+            // Update canvas background
+            canvas.backgroundColor = isDarkMode ? '#1f2937' : '#ffffff';
+            canvas.renderAll();
+            
+            // Redraw template
+            drawTemplate(pages[currentPageIndex]?.template || 'blank');
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('backdrop');
+            
+            if (isMobile) {
+                sidebar.classList.add('open');
+                backdrop.classList.remove('hidden');
+            } else {
+                sidebar.classList.toggle('hidden');
+            }
+        }
+
+        function closeSidebar() {
+            if (isMobile) {
+                const sidebar = document.getElementById('sidebar');
+                const backdrop = document.getElementById('backdrop');
+                sidebar.classList.remove('open');
+                backdrop.classList.add('hidden');
+            }
+        }
+
+        function saveState() {
+            const state = JSON.stringify(canvas.toJSON());
+            undoStack.push(state);
+            redoStack = [];
+            
+            if (undoStack.length > 50) {
+                undoStack.shift();
+            }
+        }
+
+        function undo() {
+            if (undoStack.length > 1) {
+                redoStack.push(undoStack.pop());
+                const state = undoStack[undoStack.length - 1];
+                canvas.loadFromJSON(state, () => {
+                    canvas.renderAll();
+                });
+            }
+        }
+
+        function redo() {
+            if (redoStack.length > 0) {
+                const state = redoStack.pop();
+                undoStack.push(state);
+                canvas.loadFromJSON(state, () => {
+                    canvas.renderAll();
+                });
+            }
+        }
+
+        function deleteSelected() {
+            const activeObjects = canvas.getActiveObjects();
+            if (activeObjects.length > 0) {
+                // Animate deletion
+                activeObjects.forEach(obj => {
+                    obj.animate('opacity', 0, {
+                        duration: 200,
+                        easing: fabric.util.ease.easeOutCubic,
+                        onComplete: () => {
+                            canvas.remove(obj);
+                        }
+                    });
+                    obj.animate('scaleX', 0.8, { duration: 200 });
+                    obj.animate('scaleY', 0.8, { duration: 200 });
+                });
+                
+                canvas.discardActiveObject();
+                setTimeout(() => canvas.renderAll(), 200);
+            }
+        }
+
+        function clearCanvas() {
+            if (confirm('Are you sure you want to clear all content on this page?')) {
+                const objects = canvas.getObjects();
+                
+                // Animate all objects disappearing
+                objects.forEach((obj, index) => {
+                    setTimeout(() => {
+                        obj.animate('opacity', 0, {
+                            duration: 150,
+                            easing: fabric.util.ease.easeOutCubic,
+                            onComplete: () => {
+                                canvas.remove(obj);
+                                if (index === objects.length - 1) {
+                                    canvas.renderAll();
+                                    saveState();
+                                }
+                            }
+                        });
+                        obj.animate('scaleX', 0.5, { duration: 150 });
+                        obj.animate('scaleY', 0.5, { duration: 150 });
+                    }, index * 50);
+                });
+            }
+        }
+
+        function updateDeleteButton() {
+            const deleteBtn = document.getElementById('deleteSelectedBtn');
+            if (deleteBtn) {
+                const hasSelection = canvas.getActiveObjects().length > 0;
+                deleteBtn.disabled = !hasSelection;
+                deleteBtn.className = hasSelection ? 
+                    'w-full bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white py-3 px-4 rounded-xl transition-all duration-300 transform hover:scale-105' :
+                    'w-full bg-gray-300 text-gray-500 py-3 px-4 rounded-xl cursor-not-allowed';
+            }
+        }
+
+        function showNewNotebookModal() {
+            const modal = document.getElementById('newNotebookModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.getElementById('notebookNameInput').focus();
+        }
+
+        function hideNewNotebookModal() {
+            const modal = document.getElementById('newNotebookModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.getElementById('notebookNameInput').value = '';
+        }
+
+        function createNewNotebook() {
+            const name = document.getElementById('notebookNameInput').value.trim();
+            if (!name) {
+                alert('Please enter a notebook name');
+                return;
+            }
+
+            const newNotebook = {
+                id: Date.now(),
+                name: name,
+                pages: [{ id: 1, objects: [], template: selectedTemplate }]
+            };
+
+            notebooks.push(newNotebook);
+            renderNotebooksList();
+            hideNewNotebookModal();
+            
+            currentNotebookId = newNotebook.id;
+            currentPageIndex = 0;
+            loadNotebook(newNotebook.id);
+        }
+
+        function loadNotebooks() {
+            const saved = localStorage.getItem('goodnotes_notebooks');
+            if (saved) {
+                notebooks = JSON.parse(saved);
+            }
+            renderNotebooksList();
+        }
+
+        function saveNotebooks() {
+            localStorage.setItem('goodnotes_notebooks', JSON.stringify(notebooks));
+        }
+
+        function renderNotebooksList() {
+            const list = document.getElementById('notebooksList');
+            list.innerHTML = '';
+
+            notebooks.forEach(notebook => {
+                const item = document.createElement('div');
+                item.className = `notebook-item p-3 rounded-xl cursor-pointer flex items-center justify-between ${
+                    notebook.id === currentNotebookId ? 'active bg-blue-50 dark:bg-blue-900/30' : ''
+                }`;
+                item.dataset.id = notebook.id;
+
+                item.innerHTML = `
+                    <div class="flex items-center space-x-3" onclick="loadNotebook(${notebook.id})">
+                        <i class="fas fa-book text-blue-500 text-lg"></i>
+                        <span class="text-gray-900 dark:text-white font-medium">${notebook.name}</span>
+                    </div>
+                    <button class="delete-btn text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-300" onclick="deleteNotebook(${notebook.id})">
+                        <i class="fas fa-trash-alt text-xs"></i>
+                    </button>
+                `;
+
+                list.appendChild(item);
+            });
+        }
+
+        function loadNotebook(id) {
+            const notebook = notebooks.find(n => n.id === id);
+            if (!notebook) return;
+
+            currentNotebookId = id;
+            currentPageIndex = 0;
+            pages = notebook.pages || [{ id: 1, objects: [], template: 'blank' }];
+
+            document.getElementById('currentNotebook').textContent = notebook.name;
+            renderPagesList();
+            loadCurrentPage();
+            updateUI();
+            closeSidebar();
+        }
+
+        function deleteNotebook(id) {
+            if (notebooks.length <= 1) {
+                alert('Cannot delete the last notebook');
+                return;
+            }
+
+            if (confirm('Are you sure you want to delete this notebook?')) {
+                notebooks = notebooks.filter(n => n.id !== id);
+                
+                if (currentNotebookId === id) {
+                    loadNotebook(notebooks[0].id);
+                }
+                
+                renderNotebooksList();
+                saveNotebooks();
+            }
+        }
+
+        function addPage() {
+            const newPage = {
+                id: Date.now(),
+                objects: [],
+                template: selectedTemplate || 'blank'
+            };
+            
+            pages.push(newPage);
+            currentPageIndex = pages.length - 1;
+            renderPagesList();
+            loadCurrentPage();
+            saveNotebooks();
+        }
+
+        function deletePage() {
+            if (pages.length <= 1) {
+                alert('Cannot delete the last page');
+                return;
+            }
+
+            if (confirm('Are you sure you want to delete this page?')) {
+                pages.splice(currentPageIndex, 1);
+                if (currentPageIndex >= pages.length) {
+                    currentPageIndex = pages.length - 1;
+                }
+                renderPagesList();
+                loadCurrentPage();
+                saveNotebooks();
+            }
+        }
+
+        function navigatePage(direction) {
+            const newIndex = currentPageIndex + direction;
+            if (newIndex >= 0 && newIndex < pages.length) {
+                saveCurrentPage();
+                currentPageIndex = newIndex;
+                loadCurrentPage();
+                updatePagesList();
+            }
+        }
+
+        function saveCurrentPage() {
+            if (pages[currentPageIndex]) {
+                pages[currentPageIndex].objects = canvas.toJSON().objects;
+                saveNotebooks();
+            }
+        }
+
+        function loadCurrentPage() {
+            canvas.clear();
+            canvas.backgroundColor = isDarkMode ? '#1f2937' : '#ffffff';
+            
+            const currentPage = pages[currentPageIndex];
+            
+            if (currentPage && currentPage.objects) {
+                canvas.loadFromJSON({
+                    version: fabric.version,
+                    objects: currentPage.objects
+                }, () => {
+                    canvas.renderAll();
+                    saveState();
+                });
+            } else {
+                canvas.renderAll();
+                saveState();
+            }
+
+            // Draw template
+            drawTemplate(currentPage?.template || 'blank');
+        }
+
+        function renderPagesList() {
+            const list = document.getElementById('pagesList');
+            list.innerHTML = '';
+
+            pages.forEach((page, index) => {
+                const item = document.createElement('div');
+                item.className = `page-thumbnail w-12 h-16 bg-white dark:bg-gray-700 rounded-lg border-2 flex items-center justify-center cursor-pointer transition-all duration-300 ${
+                    index === currentPageIndex ? 'active border-blue-500' : 'border-gray-300 dark:border-gray-600'
+                }`;
+                item.innerHTML = `<span class="text-xs font-medium">${index + 1}</span>`;
+                item.onclick = () => {
+                    saveCurrentPage();
+                    currentPageIndex = index;
+                    loadCurrentPage();
+                    updatePagesList();
+                };
+                list.appendChild(item);
+            });
+        }
+
+        function updatePagesList() {
+            document.querySelectorAll('.page-thumbnail').forEach((thumb, index) => {
+                thumb.className = `page-thumbnail w-12 h-16 bg-white dark:bg-gray-700 rounded-lg border-2 flex items-center justify-center cursor-pointer transition-all duration-300 ${
+                    index === currentPageIndex ? 'active border-blue-500' : 'border-gray-300 dark:border-gray-600'
+                }`;
+            });
+        }
+
+        function handleFileImport(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                if (file.type.startsWith('image/')) {
+                    fabric.Image.fromURL(event.target.result, function(img) {
+                        const maxWidth = canvas.width * 0.8;
+                        if (img.width > maxWidth) {
+                            img.scaleToWidth(maxWidth);
+                        }
+                        
+                        img.set({
+                            left: (canvas.width - img.getScaledWidth()) / 2,
+                            top: (canvas.height - img.getScaledHeight()) / 2,
+                            opacity: 0
+                        });
+                        
+                        canvas.add(img);
+                        
+                        // Animate image appearance
+                        img.animate('opacity', 1, {
+                            duration: 500,
+                            easing: fabric.util.ease.easeOutCubic
+                        });
+                        
+                        canvas.renderAll();
+                    });
+                } else {
+                    alert('File type not supported yet. Please upload an image file.');
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function exportNotebook() {
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = 800;
+            exportCanvas.height = 1000 * pages.length;
+            const ctx = exportCanvas.getContext('2d');
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+            let currentY = 0;
+            const promises = pages.map((page, index) => {
+                return new Promise((resolve) => {
+                    const tempCanvas = new fabric.Canvas(document.createElement('canvas'), {
+                        width: 800,
+                        height: 1000
+                    });
+                    
+                    tempCanvas.loadFromJSON({
+                        version: fabric.version,
+                        objects: page.objects || []
+                    }, () => {
+                        const dataURL = tempCanvas.toDataURL();
+                        const img = new Image();
+                        img.onload = () => {
+                            ctx.drawImage(img, 0, currentY);
+                            currentY += 1000;
+                            resolve();
+                        };
+                        img.src = dataURL;
+                    });
+                });
+            });
+
+            Promise.all(promises).then(() => {
+                const link = document.createElement('a');
+                const notebook = notebooks.find(n => n.id === currentNotebookId);
+                link.download = `${notebook.name}.png`;
+                link.href = exportCanvas.toDataURL();
+                link.click();
+            });
+        }
+
+        function handleSearch(e) {
+            const query = e.target.value.toLowerCase();
+            const items = document.querySelectorAll('.notebook-item');
+            
+            items.forEach(item => {
+                const name = item.querySelector('span').textContent.toLowerCase();
+                item.style.display = name.includes(query) ? 'flex' : 'none';
+            });
+        }
+
+        function handleKeyboardShortcuts(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'z':
+                        e.preventDefault();
+                        if (e.shiftKey) {
+                            redo();
+                        } else {
+                            undo();
+                        }
+                        break;
+                    case 'a':
+                        e.preventDefault();
+                        canvas.selectAll();
+                        break;
+                    case 'Delete':
+                    case 'Backspace':
+                        e.preventDefault();
+                        deleteSelected();
+                        break;
+                }
+            }
+        }
+
+        function updateUI() {
+            renderNotebooksList();
+            renderPagesList();
+            saveNotebooks();
+        }
+
+        // Auto-save
+        setInterval(() => {
+            if (canvas && pages[currentPageIndex]) {
+                saveCurrentPage();
+            }
+        }, 5000);
+
+        // Save before unload
+        window.addEventListener('beforeunload', () => {
+            saveCurrentPage();
+        });
+
+        // Make functions globally accessible
+        window.loadNotebook = loadNotebook;
+        window.deleteNotebook = deleteNotebook;
+    </script>
+</body>
+</html>
